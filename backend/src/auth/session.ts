@@ -32,21 +32,32 @@ export function verifySession(token: string | undefined, env = process.env): Ses
   }
 }
 
-export function setSessionCookie(res: Response, token: string, env = process.env): void {
+export function setSessionCookie(
+  res: Response,
+  token: string,
+  env = process.env
+): void {
+  const isProduction = env.NODE_ENV === "production";
+
   res.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
     maxAge: SESSION_TTL_SECONDS * 1000,
     path: "/",
   });
 }
 
-export function clearSessionCookie(res: Response, env = process.env): void {
+export function clearSessionCookie(
+  res: Response,
+  env = process.env
+): void {
+  const isProduction = env.NODE_ENV === "production";
+
   res.clearCookie(SESSION_COOKIE, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
     path: "/",
   });
 }
