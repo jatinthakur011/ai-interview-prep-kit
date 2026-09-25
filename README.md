@@ -9,6 +9,17 @@ mandatory batch CLI) and frontend (Next.js builder + practice UI) are both
 implemented, wired together, and manually verified end to end (generation,
 regeneration with edit-preservation, practice mode, and the batch CLI).
 
+## Screenshots
+
+**Landing page**
+![Landing page](docs/screenshots/home.png)
+
+**New kit form**
+![New kit form](docs/screenshots/new-kit.png)
+
+**Generated kit — company brief and requirements**
+![Kit view](docs/screenshots/kit-view.png)
+
 ## Tech stack
 
 | Layer      | Choice                          |
@@ -103,8 +114,12 @@ with no extra configuration.
   connect dialog.
 
 Live URLs:
-- Frontend: `<fill in after deploying>`
-- Backend: `<fill in after deploying>`
+- Frontend: [frontend-gamma-wheat-83.vercel.app](https://frontend-gamma-wheat-83.vercel.app/)
+- Backend: [ai-interview-prep-kit-q1qr.onrender.com](https://ai-interview-prep-kit-q1qr.onrender.com)
+
+> **Note:** The backend is hosted on Render's free tier, which spins down
+> after 15 minutes of inactivity. The first request after idling can take
+> 20–30 seconds to wake up — this is expected, not a bug.
 
 ## Frontend architecture
 
@@ -162,3 +177,19 @@ for the public HTTP API, where loopback URLs are rejected as an SSRF
 protection).
 
 ## High-level architecture
+
+<!--
+  ⚠️ EVERYTHING BELOW THIS LINE IS MISSING.
+
+  The pasted content cut off exactly at this heading both times it was sent,
+  so this file only contains what came before "## High-level architecture".
+  Whatever was originally written for High-level architecture, Retrieval
+  approach, Sequencing, State representation, Security, Edge cases, Testing,
+  and Known limitations is NOT reproduced here — inventing that content would
+  risk putting wrong technical claims in your submission, so it has been left
+  out rather than guessed.
+
+  To finish this file: open your real README.md in a text editor, copy
+  everything from "## High-level architecture" to the end of the file, and
+  paste it in below this comment block (then delete this comment block).
+-->
