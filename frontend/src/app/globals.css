@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #faf9f6;
+  background-image:
+    radial-gradient(ellipse 900px 500px at 8% -5%, rgba(79, 70, 229, 0.13), transparent 55%),
+    radial-gradient(ellipse 700px 500px at 100% 0%, rgba(124, 58, 237, 0.1), transparent 50%),
+    radial-gradient(ellipse 600px 400px at 50% 100%, rgba(79, 70, 229, 0.05), transparent 50%);
+  background-attachment: fixed;
+  color: #17171c;
+}
+
+::selection {
+  background: rgba(79, 70, 229, 0.18);
+}
+
+/* Scrollbar polish (WebKit) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(23, 23, 28, 0.15);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(23, 23, 28, 0.25);
+  background-clip: padding-box;
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes flip-in {
+  from {
+    opacity: 0;
+    transform: rotateX(8deg) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: rotateX(0) scale(1);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out both;
+}
+.animate-flip-in {
+  animation: flip-in 0.25s ease-out both;
+}
+
+@layer components {
+  /* ---------- Surfaces ---------- */
+  .card {
+    @apply rounded-xl border border-black/[0.07] bg-white shadow-card;
+  }
+  .card-pad {
+    @apply p-4 sm:p-5;
+  }
+  .card-hover {
+    @apply transition duration-150 hover:-translate-y-0.5 hover:shadow-raised;
+  }
+  .panel-info {
+    @apply rounded-lg border border-info-border bg-info-soft px-3 py-2.5 text-sm text-info;
+  }
+  .panel-success {
+    @apply rounded-lg border border-success-border bg-success-soft px-3 py-2.5 text-sm text-success;
+  }
+  .panel-warning {
+    @apply rounded-lg border border-warning-border bg-warning-soft px-3 py-2.5 text-sm text-warning;
+  }
+  .panel-danger {
+    @apply rounded-lg border border-danger-border bg-danger-soft px-3 py-2.5 text-sm text-danger;
+  }
+  .panel-dashed {
+    @apply rounded-xl border border-dashed border-black/15 bg-black/[0.015];
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors duration-150 focus-ring disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  .btn-md {
+    @apply px-4 py-2;
+  }
+  .btn-lg {
+    @apply px-5 py-2.5 text-base;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white shadow-sm hover:bg-accent-hover;
+  }
+  .btn-secondary {
+    @apply btn border border-black/15 bg-white text-ink hover:bg-black/[0.04];
+  }
+  .btn-ghost {
+    @apply btn text-ink/60 hover:bg-black/[0.05] hover:text-ink;
+  }
+  .btn-ghost-danger {
+    @apply btn text-ink/50 hover:bg-danger-soft hover:text-danger;
+  }
+
+  /* ---------- Form controls ---------- */
+  .field {
+    @apply flex flex-col gap-1.5 text-sm;
+  }
+  .field-label {
+    @apply text-xs font-medium text-ink/60;
+  }
+  .input {
+    @apply w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm shadow-sm transition focus-ring focus:border-accent;
+  }
+  .input-sm {
+    @apply rounded-md border border-black/15 bg-white px-2 py-1.5 text-sm shadow-sm transition focus-ring focus:border-accent;
+  }
+  .select-sm {
+    @apply input-sm;
+  }
+  .textarea {
+    @apply input;
+  }
+
+  /* ---------- Badges ---------- */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  /* ---------- Section headings ---------- */
+  .section-title {
+    @apply text-xs font-semibold uppercase tracking-wide text-ink/45;
+  }
+
+  /* ---------- Tabs ---------- */
+  .tab {
+    @apply rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-ring;
+  }
+  .tab-active {
+    @apply tab bg-accent text-white shadow-sm;
+  }
+  .tab-inactive {
+    @apply tab border border-black/15 bg-white text-ink/70 hover:bg-black/[0.04];
+  }
+
+  /* ---------- Difficulty scale ---------- */
+  .difficulty-1 {
+    @apply bg-success-soft text-success;
+  }
+  .difficulty-2 {
+    @apply bg-warning-soft text-warning;
+  }
+  .difficulty-3 {
+    @apply bg-danger-soft text-danger;
+  }
+
+  /* ---------- Category accents ---------- */
+  .cat-technical {
+    @apply border-l-4 border-l-info;
+  }
+  .cat-behavioural {
+    @apply border-l-4 border-l-success;
+  }
+  .cat-system-design {
+    @apply border-l-4 border-l-accent;
+  }
+  .cat-company-fit {
+    @apply border-l-4 border-l-warning;
+  }
+
+  /* ---------- Brand / hero ---------- */
+  .gradient-text {
+    @apply bg-gradient-to-r from-accent via-accent to-violet bg-clip-text text-transparent;
+  }
+  .icon-badge {
+    @apply grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-sm;
+  }
+  .btn-primary-gradient {
+    @apply btn bg-gradient-to-r from-accent to-violet text-white shadow-md shadow-accent/20 transition hover:shadow-lg hover:shadow-accent/25 hover:brightness-105;
+  }
+}

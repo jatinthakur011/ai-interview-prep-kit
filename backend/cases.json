@@ -1,0 +1,20 @@
+[
+  {
+    "id": "case-01",
+    "jd": "Senior Backend Engineer\n\nWe are looking for a Senior Backend Engineer with 5+ years of experience in Node.js and distributed systems. Must have strong knowledge of PostgreSQL and experience with Docker and Kubernetes. Bonus points for experience with Kafka. You will mentor junior engineers and own the payments service end to end.",
+    "company_url": "https://about.gitlab.com/",
+    "days": 5
+  },
+  {
+    "id": "case-02",
+    "jd": "Software Engineer\n\nWe need a full stack engineer.",
+    "company_url": "https://posthog.com/",
+    "days": 3
+  },
+  {
+    "id": "case-03",
+    "jd": "Frontend Developer\n\nRequired: 3+ years React experience, strong CSS skills, familiarity with TypeScript. Nice to have: experience with Next.js.",
+    "company_url": "https://this-domain-should-not-exist-xyzxyz.com/",
+    "days": 7
+  }
+]

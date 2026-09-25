@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Environment secrets — never commit these
+.env
+.env.local
+.env.*.local
+
+# Next.js build output
+.next/
+out/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Batch CLI local test output (keep cases.json/kits.json out unless you want them tracked)
+backend/kits.json
