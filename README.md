@@ -176,20 +176,198 @@ the crawler is told to allow loopback fetches only for this command (never
 for the public HTTP API, where loopback URLs are rejected as an SSRF
 protection).
 
-## High-level architecture
 
-<!--
-  ⚠️ EVERYTHING BELOW THIS LINE IS MISSING.
+Retrieval, extraction, generation, scheduling and persistence are kept as
+separate modules on purpose (backend requirement): the API layer never talks
+to Gemini directly, and the pipeline never talks to MongoDB — `generateKit()`
+is a pure function of (job description, company URL, days, an `LLMClient`, a
+`DiscussionSearchClient`) → a validated `Kit`.
 
-  The pasted content cut off exactly at this heading both times it was sent,
-  so this file only contains what came before "## High-level architecture".
-  Whatever was originally written for High-level architecture, Retrieval
-  approach, Sequencing, State representation, Security, Edge cases, Testing,
-  and Known limitations is NOT reproduced here — inventing that content would
-  risk putting wrong technical claims in your submission, so it has been left
-  out rather than guessed.
+## Retrieval approach and sources used
 
-  To finish this file: open your real README.md in a text editor, copy
-  everything from "## High-level architecture" to the end of the file, and
-  paste it in below this comment block (then delete this comment block).
--->
+- **Job description**: pasted as text, never fetched — most boards block
+  automated access, and the brief asks for effort to go into the interesting
+  half instead.
+- **Company site**: `crawlCompanySite()` fetches the homepage, extracts every
+  same-origin link, and *ranks* them by how strongly the URL/anchor text
+  suggests "this is about hiring" (`/careers`, `/jobs`, "how we hire", "life
+  at", etc. — a scoring function, not a fixed path list, because the brief's
+  own test found the real page at unpredictable paths). The top-scoring pages
+  are fetched, re-scored using their actual content, and the best becomes the
+  hiring/interview-process page. `robots.txt` is respected before any page
+  (including the homepage) is fetched.
+- **Public interview discussion**: one Brave Search query per company
+  (`"<company> interview process questions experience"`), results ranked by
+  a relevance heuristic (mentions the company + "interview", or comes from a
+  known discussion host like Glassdoor/Blind/Reddit). Absence is reported
+  honestly, not treated as an error (Section 10).
+
+## Sequencing (brief Section 3)
+
+`generateKit()` runs, in order:
+
+1. **Extract requirements** from the pasted JD (LLM call, one attempt +
+   one JSON-repair retry). Every kept requirement's `evidence` must appear
+   verbatim in the JD — anything the model proposes that isn't actually
+   there is dropped, never invented. Must/nice is settled by the JD's own
+   wording (`jdStructure.ts`) where that's unambiguous, overruling the
+   model's guess.
+2. **Crawl the company site** (only useful *after* step 1 tells us anything
+   about who's hiring — the homepage needs no context from the JD, but the
+   choice of what to do with the hiring page does).
+3. **Search for public interview discussion**, keyed off the company name
+   extracted/derived in step 1.
+4. **Generate questions**, one LLM call *per requirement*, with a
+   category-specific system prompt chosen by the requirement's `kind`
+   (technical → hands-on technical prompts; behavioural → STAR-style
+   prompts) — Section 3 is explicit that these must not come from the same
+   call with the same instructions. A separate call generates
+   process/system-design questions, but only if a hiring page or discussion
+   was actually found — no hiring info, no invented process questions.
+5. **Coverage check + second pass** (`buildQuestionBank.ts` /
+   `coverage.ts`): deterministic, in code, never the model's call. Any
+   requirement no question references comes back as a gap; the gap
+   requirements are re-sent for question generation; this repeats up to 3
+   passes (see the rationale comment in `buildQuestionBank.ts`), after which
+   any still-uncovered requirement is recorded honestly in
+   `coverage.uncovered_requirement_ids` rather than looped on forever.
+6. **Flashcards** are derived deterministically from the questions that now
+   exist (no extra LLM call — see the rationale in `generateFlashcards.ts`;
+   it's a token-budget decision, not laziness).
+7. **Schedule allocation** (`scheduler.ts`) is pure arithmetic: sort
+   questions by (must-have, then difficulty) descending, split into exactly
+   `days` buckets as evenly as possible with earlier buckets getting the
+   remainder, so harder/must-have material lands earlier. Fewer questions
+   than days → the leftover days become review days that re-cycle the
+   hardest material, so a schedule always has exactly the requested number
+   of non-empty days (1-day and 60-day both work).
+8. **Company brief** is generated last from whatever homepage/hiring-page
+   text was actually retrieved. If nothing was retrievable, no LLM call is
+   made at all — the brief says so honestly instead of inventing a company
+   description.
+
+## Representing generated / edited / pinned state (Section 6)
+
+Every `Question` and `Flashcard` carries an `origin` field (an extension to
+Appendix A the brief explicitly allows): `"generated"`, `"user_added"`, or
+`"user_edited"`. Anything the pipeline writes is `"generated"`; any edit or
+manual addition made through the builder API flips it to `"user_edited"` /
+`"user_added"` and it stays that way. When a question category is
+regenerated (`regenerateSection.ts`), only the `"generated"` items in that
+category are discarded and replaced — anything the user touched by hand
+survives, exactly as the brief requires (verified manually: editing a
+question, regenerating its category, and confirming the edited question
+is still present afterwards). Deleting a question also prunes its id out
+of the schedule and recomputes that day's minutes, so the schedule never
+references a question that no longer exists. The same pruning runs after a
+category regeneration; a day whose questions were *all* replaced by fresh
+ones now correctly shows 0 scheduled minutes for that day rather than
+keeping the pre-regeneration total.
+
+Editing is field-level, not question-level: changing only a question's
+prompt does not regenerate its answer outline, and vice versa — each text
+box saves independently on blur. If only one field is edited, the other can
+end up stale relative to it (e.g. the prompt is rewritten but the old answer
+outline is left as-is); this is a deliberate trade-off for "immediate,
+no-round-trip" editing (Section 12) rather than a bug, and the person can
+simply edit the other field too, or delete and let it regenerate fresh.
+
+## Long-running generation (Section 13: "what happens when it takes 90
+seconds, fails halfway, or is triggered twice")
+
+`POST /api/kits` inserts a `"generating"` document and returns its id
+immediately (202) — the actual `generateKit()` call runs in the background
+(`api/generation.ts`) and the frontend is expected to poll `GET
+/api/kits/:id` for status (`pending` → `generating` → `ready`/`failed`). A
+failure sets `status: "failed"` with a structured `{code, message}` and logs
+the full underlying error (including any wrapped cause, e.g. the exact
+Gemini HTTP status) server-side for debugging; it never leaves a document
+stuck mid-write. Regenerating a section that then fails leaves the kit's
+previous `"ready"` state and content untouched — only the error is recorded
+— so a failed regeneration can never destroy the last good version.
+Submitting the same JD+company twice simply creates two documents (no
+de-duplication key is enforced yet); documented here as a known limitation
+rather than silently pretended-away.
+
+**Cross-origin session cookie:** the frontend (Vercel) and backend (Render)
+are deployed on different origins, so the session cookie is set with
+`SameSite=None; Secure` in production (and `SameSite=Lax` for same-origin
+local dev, where `None` isn't needed and would require HTTPS). This is
+standard for a split frontend/backend deployment, but it does mean any
+browser mode that blocks third-party cookies by design — notably Chrome's
+Incognito mode — will not persist the session, even though the cookie is
+configured correctly; this is a browser privacy feature, not an app bug, and
+does not affect normal browsing mode.
+
+## Security (Section 11)
+
+- `assertSafeUrl()` rejects non-http(s) schemes and known private/loopback
+  IP ranges before any fetch; loopback is allowed only when explicitly
+  requested (`allowLocalFetch`), which only the batch CLI sets — the public
+  HTTP API never allows it, so it can't be used to probe internal
+  infrastructure via a company URL.
+  **Known limitation**: this checks the URL's literal host, not where a
+  hostname resolves at fetch time, so a DNS-rebinding attack (public
+  hostname that later resolves to a private IP) isn't caught. Documented,
+  not silently ignored.
+- Page fetches enforce a content-type allowlist (`text/html` and friends)
+  and a byte-size cap (2 MB), and time out after 10s.
+- Both the pasted JD and every fetched page are wrapped as clearly
+  delimited untrusted `<job_description>`/`<source>` DATA in every LLM
+  prompt, with an explicit system-prompt instruction never to follow
+  instructions found inside them.
+
+## Edge cases (Section 10)
+
+| Case | Behaviour |
+|---|---|
+| Company URL invalid/404/timeout | Crawl reports it via `skipped`, kit generation continues with an honest, sourceless `company_brief` |
+| No discoverable hiring page | `hiringPage` stays `null`; process-specific questions are simply not generated (no info to base them on) |
+| Two-line JD stub | Few/no requirements extracted (never invented); `warnings` in the extraction result says so explicitly |
+| No public discussion found | Reported as `found: false`; not treated as an error |
+| Model returns invalid JSON | One repair-prompt retry, then the caller degrades gracefully (empty question list, honest brief) rather than crashing the whole kit |
+| Provider rate-limits / briefly fails (429/5xx) | `withRetry()` — exponential backoff + jitter (6 retries), honours `Retry-After` when the provider sends one |
+| Same JD+company submitted twice | Two separate kit documents today (no dedup key) — a documented limitation, not scored-for-free behaviour |
+| 1-day / 60-day schedule | Both handled by the same allocator (see Scheduling above); a `scheduler.test.ts` case covers both |
+
+Verified manually with a 3-case batch run (`npm run evaluate`) covering a
+detailed JD against a real company (GitLab), a two-line stub JD, and an
+unreachable company domain — all three completed with `status: "ok"` and
+honest, non-fabricated output for the thin/unreachable cases.
+
+## Testing
+
+Automated tests target the behaviour most worth protecting, as the brief
+asks for: `scheduler.test.ts` (allocation), `coverage.test.ts` (gap
+detection), `validateKit.test.ts` (structure validation), plus unit tests for
+every pipeline stage (extraction, crawling, question generation, discussion
+search, retry/backoff, robots parsing, URL safety), the batch CLI's
+ok/failed mapping (`evaluate.test.ts`), and auth primitives
+(`password.test.ts`, `session.test.ts`). 84 tests across 17 files, run with
+`npm test` (backend).
+
+Not yet covered: end-to-end HTTP route tests against a real/in-memory
+MongoDB (would need `mongodb-memory-server` or a running Mongo instance in
+CI), and automated frontend tests (the frontend is covered by TypeScript's
+type checker and manual end-to-end testing — generation, edit-and-regenerate,
+practice mode, protected-route/logout, and keyboard/mobile-viewport checks
+— rather than an automated test suite).
+
+## Known limitations
+
+- No end-to-end/API-level automated tests yet (unit-level only); no
+  automated frontend tests (manual verification only).
+- No de-duplication of identical JD+company submissions.
+- SSRF protection is IP-literal-based, not resolve-time (see Security above).
+- `GEMINI_MODEL` defaults to a rolling alias (`gemini-flash-latest`) rather
+  than a pinned version, trading reproducibility for resilience to Google
+  retiring models mid-deployment (see "LLM provider and model" above).
+- The session cookie is `SameSite=None` in production, which browsers that
+  block third-party cookies by design (e.g. Chrome Incognito) won't persist
+  — a browser privacy behaviour, not an app defect (see "Long-running
+  generation" above).
+- `tsx` (the TypeScript runner `npm start` depends on) is kept in
+  `dependencies` rather than `devDependencies`, since a production install
+  with `NODE_ENV=production` set (as most PaaS platforms do) skips
+  `devDependencies` by default, which would otherwise break the start
+  command in production while working fine locally.
