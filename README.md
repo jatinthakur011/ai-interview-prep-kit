@@ -176,6 +176,22 @@ the crawler is told to allow loopback fetches only for this command (never
 for the public HTTP API, where loopback URLs are rejected as an SSRF
 protection).
 
+## High-level architecture
+
+```
+src/
+  domain/      Appendix A kit schema (zod) + cross-reference validation
+  fetch/       SSRF-safe fetch, robots.txt, HTML→text, company-site crawler
+  discussion/  public interview-discussion search (Brave Search adapter)
+  llm/         provider-agnostic LLM client, Gemini adapter, retry/backoff, loose JSON parsing
+  pipeline/    the actual generation logic (see below) — this is what both
+               the HTTP API and the batch CLI call
+  db/          MongoDB connection + typed collections (users, kits)
+  auth/        password hashing, JWT session cookies, requireAuth middleware
+  api/         Express routes (auth, kits) + the background generation runner
+  cli/         the mandatory `npm run evaluate` entry point
+  app.ts, server.ts   Express app wiring / process entry point
+```
 
 Retrieval, extraction, generation, scheduling and persistence are kept as
 separate modules on purpose (backend requirement): the API layer never talks
